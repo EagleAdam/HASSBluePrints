@@ -1,6 +1,6 @@
 blueprint:
-  name: Motion activated light with time-based brightness
-  description: Turn on a light when motion is detected and turn it off when no motion is detected for a certain period of time. The brightness and transition time of the light are adjusted based on the time of day.
+  name: Motion activated light
+  description: Turn on a light when motion is detected and turn it off when no motion is detected for a certain period of time. Does not trigger if the light is already on.
   domain: automation
   input:
     motion_sensor:
@@ -27,10 +27,14 @@ blueprint:
           unit_of_measurement: seconds
 
 trigger:
-  platform: state
-  entity_id: !input 'motion_sensor'
-  from: 'off'
-  to: 'on'
+  - platform: state
+    entity_id: !input 'motion_sensor'
+    from: 'off'
+    to: 'on'
+  - platform: state
+    entity_id: !input 'motion_sensor'
+    from: 'clear'
+    to: 'detected'
 
 condition:
   condition: state
@@ -38,26 +42,22 @@ condition:
   state: 'off'
 
 action:
-  - variables:
-      transition_time: >
-        {% if now().hour < state_attr('sun.sun', 'next_rising').hour + 1 or now().hour > state_attr('sun.sun', 'next_setting').hour - 1 %}
-          60
-        {% else %}
-          5
-        {% endif %}
   - service: light.turn_on
     target:
       entity_id: !input 'light_entity'
-    data:
-      brightness: 255
-      transition: "{{ transition_time }}"
   - wait_for_trigger:
-      platform: state
-      entity_id: !input 'motion_sensor'
-      from: 'on'
-      to: 'off'
-      for: 
-        seconds: !input 'no_motion_wait'
+      - platform: state
+        entity_id: !input 'motion_sensor'
+        from: 'on'
+        to: 'off'
+        for: 
+          seconds: !input 'no_motion_wait'
+      - platform: state
+        entity_id: !input 'motion_sensor'
+        from: 'detected'
+        to: 'clear'
+        for: 
+          seconds: !input 'no_motion_wait'
   - service: light.turn_off
     target:
       entity_id: !input 'light_entity'
